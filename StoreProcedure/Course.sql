@@ -139,3 +139,59 @@ BEGIN
         SET i = i + 1;
     END WHILE;
 END
+
+-- Insert Student vào course
+CREATE DEFINER=`root`@`localhost` PROCEDURE `InsertStudentOnCourse`(
+    IN p_student_id BIGINT,
+    IN p_course_id BIGINT
+)
+BEGIN
+    -- Kiểm tra sinh viên có tồn tại
+    IF NOT EXISTS (SELECT 1 FROM student_account WHERE id = p_student_id) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Lỗi: Không tìm thấy sinh viên.';
+    
+    -- Kiểm tra môn học có tồn tại
+    ELSEIF NOT EXISTS (SELECT 1 FROM course WHERE id = p_course_id) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Lỗi: Không tìm thấy môn học.';
+    
+    -- Kiểm tra đã tồn tại bản ghi
+    ELSEIF EXISTS (
+        SELECT 1 FROM student_on_course 
+        WHERE student_id = p_student_id AND course_id = p_course_id
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Lỗi: Sinh viên đã đăng ký môn học này.';
+    
+    ELSE
+        -- Chèn bản ghi
+        INSERT INTO student_on_course (student_id, course_id)
+        VALUES (p_student_id, p_course_id);
+    END IF;
+END;
+
+--get all student on course
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GetAllStudentOnCourse`(
+)
+BEGIN
+    select * from student_on_course;
+END
+
+--get all student on course by course_id
+CREATE DEFINER=`root`@`localhost` PROCEDURE `GetStudentOnCourseByCourseId`(
+    IN p_course_id BIGINT
+)
+BEGIN
+    -- Kiểm tra môn học có tồn tại
+    IF NOT EXISTS (SELECT 1 FROM course WHERE id = p_course_id) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Lỗi: Không tìm thấy môn học.';
+    ELSE
+        -- Lấy danh sách sinh viên theo môn học
+        SELECT s.id, s.code, s.full_name, s.email, s.phone, s.gender, s.birthday
+        FROM student_on_course soc
+        JOIN student_account s ON soc.student_id = s.id
+        WHERE soc.course_id = p_course_id;
+    END IF;
+END;

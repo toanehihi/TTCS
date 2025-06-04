@@ -5,9 +5,10 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `ChangePassword`(
     IN p_new_password VARCHAR(255)
 )
 BEGIN
-    DECLARE v_account_id BIGINT;
+    DECLARE v_account_id BIGINT DEFAULT NULL;
     DECLARE v_password_hashed VARCHAR(255);
     DECLARE v_new_password_hashed VARCHAR(255);
+    DECLARE v_sql VARCHAR(500);
 
     -- Mã hóa mật khẩu cũ và mới
     SET v_password_hashed = SHA2(p_password, 256);
@@ -22,15 +23,22 @@ BEGIN
     -- Nếu không tìm thấy tài khoản
     IF v_account_id IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tên đăng nhập hoặc mật khẩu không đúng!';
+    ELSE
+        -- Cập nhật mật khẩu mới trong bảng account
+        UPDATE account
+        SET password = v_new_password_hashed
+        WHERE id = v_account_id;
+
+        -- Đổi mật khẩu user MySQL (mật khẩu thẳng, MySQL tự mã hóa)
+        SET @sql = CONCAT('ALTER USER \'', p_username, '\'@\'localhost\' IDENTIFIED BY \'', p_new_password, '\';');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+
+        SELECT 'Đổi mật khẩu thành công!' AS message;
     END IF;
-
-    -- Cập nhật mật khẩu mới
-    UPDATE account
-    SET password = v_new_password_hashed
-    WHERE id = v_account_id;
-
-    SELECT 'Đổi mật khẩu thành công!' AS message;
 END
+
 
 --Khóa hoặc mở khóa tài khoản
 CREATE DEFINER=`root`@`localhost` PROCEDURE `ChangeStatusAccount`(
@@ -105,15 +113,26 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `ResetPassword`(
     IN p_account_id BIGINT
 )
 BEGIN
-    -- Kiểm tra account có tồn tại không
-    IF NOT EXISTS (
-        SELECT 1 FROM account WHERE id = p_account_id
-    ) THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tài khoản không tồn tại!';
-    END IF;
+    DECLARE v_username VARCHAR(100);
+    DECLARE v_sql VARCHAR(500);
 
-    -- Cập nhật mật khẩu thành SHA2('123')
-    UPDATE account
-    SET password = SHA2('123', 256)
+    -- Kiểm tra tài khoản có tồn tại và lấy username
+    SELECT username INTO v_username
+    FROM account
     WHERE id = p_account_id;
+
+    IF v_username IS NULL THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Tài khoản không tồn tại!';
+    ELSE
+        -- Cập nhật mật khẩu trong bảng account
+        UPDATE account
+        SET password = SHA2('123', 256)
+        WHERE id = p_account_id;
+
+        -- Thay đổi mật khẩu user MySQL
+        SET @sql = CONCAT('ALTER USER \'', v_username, '\'@\'localhost\' IDENTIFIED BY \'123\';');
+        PREPARE stmt FROM @sql;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
 END
