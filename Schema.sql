@@ -194,13 +194,13 @@ CREATE TABLE report_log
 
 
 #==================================================#
-CREATE TABLE student_on_course
+CREATE TABLE student_on_course_section
 (
     student_id BIGINT,
-    course_id  BIGINT,
-    PRIMARY KEY (student_id, course_id),
+    course_section_id  BIGINT,
+    PRIMARY KEY (student_id, course_section_id),
     FOREIGN KEY (student_id) REFERENCES student_account (account_id),
-    FOREIGN KEY (course_id) REFERENCES course (id)
+    FOREIGN KEY (course_section_id) REFERENCES course_section (id)
 );
 #==================================================#
 
